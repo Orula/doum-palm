@@ -4,7 +4,7 @@
 
 This project is my attempt at implementing a reinforcement agent to play the original Doom video game, using the vizdoom toolkit.
 <p align="center">
-	<img src="Images/logo.jpg" width="350"/>
+	<img src="Images/logo.jpg" width="380"/>
 	<img src="Images/DDC.gif" width="350"/>
 </p>
 
