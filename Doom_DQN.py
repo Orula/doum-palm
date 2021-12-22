@@ -45,12 +45,14 @@ class Network(nn.Module):
     return self.features(autograd.Variable(torch.zeros(1, *self.in_dims))).view(1, -1).size(1)
 
 class DQN:
-  def __init__(self, in_dims, out_dims, MaxSize):
+  def __init__(self, in_dims, out_dims):
     self.lr = 1e-3 
     self.gamma   = 0.99
     self.epsilon = 1.0
-    self.eps_min = 0.05
-    self.eps_dec = 5e-4
+    self.eps_min = 0.01
+    self.eps_dec = 5e-7
+    self.batch_size = 32
+    self.size    = 5000 # max size of memory stack
 
     self.out_dims = out_dims
     
@@ -61,12 +63,13 @@ class DQN:
 
     # memory
     self.idx  = 0         # postion in memory stack
-    self.size = MaxSize   # max size of memory stack
-    self.states  = np.zeros((MaxSize, *in_dims), dtype=np.float32)
-    self.nstates = np.zeros((MaxSize, *in_dims), dtype=np.float32)
-    self.actions = np.zeros( MaxSize, dtype=np.int32)
-    self.rewards = np.zeros( MaxSize, dtype=np.float32)
-    self.dones   = np.zeros(MaxSize, dtype=bool)
+    self.states  = np.zeros((self.size, *in_dims), dtype=np.float32)
+    self.nstates = np.zeros((self.size, *in_dims), dtype=np.float32)
+    self.actions = np.zeros( self.size, dtype=np.int32)
+    self.rewards = np.zeros( self.size, dtype=np.float32)
+    self.dones   = np.zeros( self.size, dtype=bool)
+
+    self.learn_step_counter = 0
 
   def store(self, state, action, reward, nstate, done):
     idx = self.idx % self.size
@@ -78,9 +81,9 @@ class DQN:
     self.nstates[idx] = nstate
     self.dones[idx] = done
 
-  def sample(self, batch_size, device='cpu'):
+  def sample(self, device='cpu'):
     csize = min(self.idx, self.size)    # current size of memory stack
-    batch = np.random.choice(csize, batch_size) # sample batch
+    batch = np.random.choice(csize, self.batch_size) # sample batch
     
     states  = torch.from_numpy( self.states[batch]  )
     rewards = torch.from_numpy( self.rewards[batch] )
@@ -104,10 +107,11 @@ class DQN:
   def update_epsilon(self):
     self.epsilon = max(self.eps_min, self.epsilon*self.eps_dec)
   
-  def train(aelf, batch_size=64):
-    if len(self.memory) < batch_size: return # if buffer not full don't learn 
+  def train(self):
+    #print("hi")
+    if self.idx < self.batch_size: return # if buffer not full don't learn 
     else:
-      states, actions, rewards, nstates, terminals = self.memory.sample(batch_size)
+      states, actions, rewards, nstates, dones = self.sample(self.batch_size)
 
       indices = np.arange(self.batch_size)
 
@@ -122,8 +126,11 @@ class DQN:
       loss.backward()                      # determine gradients
       self.policy.optimizer.step()         # update weights
 
-      #self.update_epsilon()    # update epsilon value after each episode 
-      #self.update_target_net() # update target network after each episode
+      self.update_epsilon()    # update epsilon value after each episode 
+
+      self.learn_step_counter += 1
+      if self.learn_step_counter % 1000 == 0:
+        self.update_target_net() # update target network after each episode
 
     pass
  
@@ -143,10 +150,9 @@ action_space = np.identity(3,dtype=int).tolist()
 INPUT_SHAPE  = (4, 84, 84)
 ACTION_SIZE  = len(action_space)
 
-update_every = 1000   # how often to update the network
-num_episodes = 1000   # number of training episodes
+num_episodes = 500   # number of training episodes
 
-agent = DQN(INPUT_SHAPE, ACTION_SIZE, MaxSize=5000)
+agent = DQN(INPUT_SHAPE, ACTION_SIZE)
 
 
 scores = []
@@ -166,17 +172,14 @@ for epi in range(1, num_episodes+1):
 
     step_cnt +=1
     score += reward
-    if step_cnt % update_every == 0: agent.train()
+    agent.train()
     if done: 
-      agent.store(state, action, reward, state, done)
       break
     else:
       next_state = stack_frames(state, game.get_state().screen_buffer.transpose(1, 2, 0), False)
       agent.store(state, action, reward, next_state, done)
       state = next_state
 
-  agent.update_epsilon()    # update epsilon value after each episode 
-  agent.update_target_net() # update target network after each episode
   scores.append(score)
 
   print('Episode {} Episode score: {:.2f} Running average score: {:.2f}'.format(epi, score, np.mean(scores[-100:])))
