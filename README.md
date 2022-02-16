@@ -1,6 +1,4 @@
-# Doum-Palm the Doom bot
-
-> Hyphaene thebaica, with common names doum palm (Ar: دوم) and gingerbread tree (also mistakenly **doom palm**) - wikipedia
+# VizDoom agent
 
 This project is my attempt at implementing a reinforcement agent to play the original Doom video game, using the vizdoom toolkit.
 <p align="center">
